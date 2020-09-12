@@ -25,27 +25,27 @@ import java.util.concurrent.TimeUnit;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 public class CloudflareAccess implements Closeable {
-    
+
     @Getter
     private final String xAuthKey;
     @Getter
     private final String xAuthEmail;
-    
+
     @Getter(AccessLevel.PROTECTED)
     private final RestClient restClient;
-    
+
     private ExecutorService threadPool;
-    
-    
+
+
     public static final String API_BASE_URL = "https://api.cloudflare.com/client/v4/";
-    
+
     private static ExecutorService newDefaultThreadPool( int maxThreads ) {
         return Executors.newFixedThreadPool( maxThreads );
     }
-    
+
     public static final int DEFAULT_MAX_THREADS = 100;
     public static final ExecutorService DEFAULT_THREAD_POOL = newDefaultThreadPool( DEFAULT_MAX_THREADS );
-    
+
     /**
      * This gson object is used for parsing results fora CloudflareResponse
      * Change this gson for own specifications.
@@ -54,7 +54,7 @@ public class CloudflareAccess implements Closeable {
     private static Gson gson = new GsonBuilder()
             .registerTypeAdapter( ZoneSetting.class, new ZoneSettingDeserializer() )
             .create();
-    
+
     public CloudflareAccess( @NonNull String xAuthKey, @NonNull String xAuthEmail, @Nullable ExecutorService threadPool ) {
         this(xAuthKey, xAuthEmail, threadPool, API_BASE_URL);
     }
@@ -66,8 +66,7 @@ public class CloudflareAccess implements Closeable {
         restClient = RestClient.builder()
             .baseUrl( apiBaseUrl )
             .defaultHeader( "Content-Type", "application/json" )
-            .defaultHeader( "X-Auth-Key", this.getXAuthKey() )
-            .defaultHeader( "X-Auth-Email", this.getXAuthEmail() )
+            .defaultHeader( "Authorization", "Bearer " + this.getXAuthKey() )
             .followRedirect( false )
             .cookieSpec( CookieSpecs.IGNORE_COOKIES )
             .build();
@@ -76,11 +75,11 @@ public class CloudflareAccess implements Closeable {
     public CloudflareAccess( String xAuthKey, String xAuthEmail, int maxThreads ) {
         this( xAuthKey, xAuthEmail, newDefaultThreadPool( maxThreads ) );
     }
-    
+
     public CloudflareAccess( String xAuthKey, String xAuthEmail ) {
         this( xAuthKey, xAuthEmail, null );
     }
-    
+
     public CloudflareAccess( CloudflareConfig config ) {
         this( checkNotNull( config ).getXAuthKey(),
                 config.getXAuthEmail(),
@@ -88,28 +87,28 @@ public class CloudflareAccess implements Closeable {
                         config.getThreadPool() : newDefaultThreadPool(
                         config.getMaxThreads() != null ? config.getMaxThreads() : DEFAULT_MAX_THREADS ) );
     }
-    
+
     public static void setGson( Gson gson ) {
         CloudflareAccess.gson = checkNotNull( gson );
     }
-    
+
     public boolean isThreadPoolInitialized( ) {
         return threadPool != null;
     }
-    
+
     public ExecutorService getThreadPool( ) {
         if ( !isThreadPoolInitialized() )
             threadPool = DEFAULT_THREAD_POOL;
         return threadPool;
     }
-    
-    
+
+
     public void close( long timeout, TimeUnit unit ) {
         getRestClient().close();
         if ( threadPool != null )
             MoreExecutors.shutdownAndAwaitTermination( threadPool, timeout, checkNotNull( unit ) );
     }
-    
+
     @Override
     public void close( ) {
         close( 4, TimeUnit.SECONDS );
